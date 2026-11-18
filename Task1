@@ -1,0 +1,138 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace ShopSimulation
+{
+    class Product
+    {
+        public string Name { get; }
+        public int Price { get; }
+        public int Quantity { get; set; }
+
+        public Product(string name, int price, int quantity)
+        {
+            Name = name;
+            Price = price;
+            Quantity = quantity;
+        }
+    }
+
+    class Customer
+    {
+        public int CardNumber { get; }
+        public int Money { get; private set; }
+        public int ItemsBought { get; private set; }
+        public int MoneySpent { get; private set; }
+
+        public Customer(Random rnd, HashSet<int> usedCards)
+        {
+            int card;
+            do { card = rnd.Next(1, 1001); } while (!usedCards.Add(card));
+            CardNumber = card;
+            Money = rnd.Next(1000, 10001);
+        }
+
+        public bool CanBuy(Product p) => p.Quantity > 0 && Money >= p.Price;
+
+        public void Buy(Product p)
+        {
+            p.Quantity--;
+            Money -= p.Price;
+            MoneySpent += p.Price;
+            ItemsBought++;
+        }
+    }
+
+    class Shop
+    {
+        private readonly Product[] _products;
+        private readonly List<Customer> _customers = new List<Customer>();
+        private readonly Random _rnd;
+        private readonly HashSet<int> _usedCards = new HashSet<int>();
+        private int _profit = 0;
+
+        public Shop(Random rnd)
+        {
+            _rnd = rnd;
+            _products = new Product[]
+            {
+                new Product("Хліб", 30, _rnd.Next(15, 30)),
+                new Product("Молоко", 45, _rnd.Next(10, 25)),
+                new Product("Сир", 220, _rnd.Next(5, 15)),
+                new Product("Яйця (10 шт.)", 70, _rnd.Next(10, 25)),
+                new Product("Кава 250г", 350, _rnd.Next(5, 12)),
+                new Product("М'ясо 1кг", 400, _rnd.Next(4, 10)),
+                new Product("Шоколад", 60, _rnd.Next(10, 30)),
+                new Product("Сік \"Яблучний\"", 55, _rnd.Next(8, 20))
+            };
+        }
+
+        // Створення заданої кількості покупців
+        public void GenerateCustomers(int count)
+        {
+            for (int i = 0; i < count; i++)
+                _customers.Add(new Customer(_rnd, _usedCards));
+        }
+
+        // Головна функція симуляції покупок
+        public void RunSimulation()
+        {
+            Console.WriteLine("\n--- Початок симуляції ---");
+            bool canAnyoneBuy = true;
+
+            // Цикл триває, поки є хоча б один товар, який може купити хоча б один покупець
+            while (canAnyoneBuy)
+            {
+                canAnyoneBuy = false;
+
+                foreach (var customer in _customers)
+                {
+                    var available = _products.Where(customer.CanBuy).ToList();
+                    if (available.Count == 0) continue;
+
+                    var product = available[_rnd.Next(available.Count)];
+                    customer.Buy(product);
+                    _profit += product.Price;
+                    canAnyoneBuy = true;
+
+                    Console.WriteLine($"Картка #{customer.CardNumber:D4} купив \"{product.Name}\" за {product.Price} грн. (Залишок коштів: {customer.Money} грн)");
+                }
+            }
+
+            Console.WriteLine("--- Симуляцію завершено (закінчилися товари або гроші у покупців) ---");
+        }
+
+        // Виведення підсумків
+        public void PrintResults()
+        {
+            var maxItems = _customers.OrderByDescending(c => c.ItemsBought).First();
+            var maxSpent = _customers.OrderByDescending(c => c.MoneySpent).First();
+
+            Console.WriteLine("\n=========================================");
+            Console.WriteLine($"Загальний прибуток магазину: {_profit} грн.");
+            Console.WriteLine($"Найбільше товарів купив власник картки #{maxItems.CardNumber:D4} ({maxItems.ItemsBought} шт.)");
+            Console.WriteLine($"Найбільше грошей витратив власник картки #{maxSpent.CardNumber:D4} ({maxSpent.MoneySpent} грн.)");
+            Console.WriteLine("=========================================");
+        }
+    }
+
+    class Program
+    {
+        static void Main()
+        {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Random rnd = new Random();
+
+            Console.Write("Введіть кількість покупців (1-1000): ");
+            int count;
+            while (!int.TryParse(Console.ReadLine(), out count) || count < 1 || count > 1000)
+                Console.Write("Некоректне значення, спробуйте ще раз: ");
+
+            Shop shop = new Shop(rnd);
+            shop.GenerateCustomers(count);
+            shop.RunSimulation();
+            shop.PrintResults();
+        }
+    }
+}
