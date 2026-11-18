@@ -1,0 +1,193 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace SocialNetworkSimulation
+{
+    class Comment
+    {
+        public User Author { get; }
+        public string Text { get; }
+        public DateTime CreatedAt { get; }
+
+        public Comment(User author, string text)
+        {
+            Author = author;
+            Text = text;
+            CreatedAt = DateTime.Now;
+        }
+    }
+
+    class Post
+    {
+        private static int _nextId = 1;
+
+        public int Id { get; }
+        public User Author { get; }
+        public string Text { get; }
+        public DateTime CreatedAt { get; }
+        public HashSet<User> LikedBy { get; } = new HashSet<User>();
+        public List<Comment> Comments { get; } = new List<Comment>();
+
+        public int Likes => LikedBy.Count;
+
+        public Post(User author, string text, DateTime createdAt)
+        {
+            Id = _nextId++;
+            Author = author;
+            Text = text;
+            CreatedAt = createdAt;
+        }
+
+        // Повна інформація про пост
+        public void Print()
+        {
+            Console.WriteLine($"  Пост #{Id} | {Author.Nickname} | {CreatedAt:dd.MM.yyyy HH:mm}");
+            Console.WriteLine($"  Текст: {Text}");
+            Console.WriteLine($"  Лайків: {Likes}");
+            if (Comments.Count == 0)
+            {
+                Console.WriteLine("  Коментарів немає");
+            }
+            else
+            {
+                Console.WriteLine($"  Коментарі ({Comments.Count}):");
+                foreach (var c in Comments)
+                    Console.WriteLine($"    - {c.Author.Nickname} ({c.CreatedAt:dd.MM.yyyy HH:mm}): {c.Text}");
+            }
+            Console.WriteLine("  ----------------------------------------");
+        }
+    }
+
+    class User
+    {
+        public string FirstName { get; }
+        public string LastName { get; }
+        public string Email { get; }
+        public string Nickname { get; }
+        public List<Post> Posts { get; } = new List<Post>();
+
+        public User(string firstName, string lastName, string email, string nickname)
+        {
+            FirstName = firstName;
+            LastName = lastName;
+            Email = email;
+            Nickname = nickname;
+        }
+
+        // Створити новий пост
+        public Post CreatePost(string text, DateTime? createdAt = null)
+        {
+            var post = new Post(this, text, createdAt ?? DateTime.Now);
+            Posts.Add(post);
+            Console.WriteLine($"[{Nickname}] створив пост #{post.Id}");
+            return post;
+        }
+
+        // Видалити власний пост
+        public bool DeletePost(Post post)
+        {
+            if (post.Author != this)
+            {
+                Console.WriteLine($"[{Nickname}] не може видалити чужий пост #{post.Id}");
+                return false;
+            }
+            bool removed = Posts.Remove(post);
+            if (removed)
+                Console.WriteLine($"[{Nickname}] видалив пост #{post.Id}");
+            return removed;
+        }
+
+        // Отримати та вивести останні 5 постів іншого користувача
+        public void ShowLastPosts(User other, int count = 5)
+        {
+            Console.WriteLine($"\n[{Nickname}] переглядає останні {count} постів користувача {other.Nickname}:");
+            var last = other.Posts.OrderByDescending(p => p.CreatedAt).Take(count).ToList();
+            if (last.Count == 0)
+            {
+                Console.WriteLine("  Постів немає");
+                return;
+            }
+            foreach (var post in last)
+                post.Print();
+        }
+
+        // Поставити лайк
+        public void Like(Post post)
+        {
+            if (post.LikedBy.Add(this))
+                Console.WriteLine($"[{Nickname}] поставив лайк посту #{post.Id} ({post.Author.Nickname})");
+            else
+                Console.WriteLine($"[{Nickname}] вже лайкнув пост #{post.Id}");
+        }
+
+        // Написати коментар
+        public void AddComment(Post post, string text)
+        {
+            post.Comments.Add(new Comment(this, text));
+            Console.WriteLine($"[{Nickname}] прокоментував пост #{post.Id} ({post.Author.Nickname})");
+        }
+
+        public void PrintInfo()
+        {
+            Console.WriteLine($"{FirstName} {LastName} | {Email} | {Nickname} | постів: {Posts.Count}");
+        }
+    }
+
+    class Program
+    {
+        static void Main()
+        {
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+            // Користувачі системи (дані описані в коді)
+            var users = new List<User>
+            {
+                new User("Іван", "Петренко", "ivan.petrenko@gmail.com", "@ivan_p"),
+                new User("Олена", "Коваль", "olena.koval@gmail.com", "@olena_k"),
+                new User("Максим", "Шевченко", "max.shev@ukr.net", "@max_sh")
+            };
+
+            Console.WriteLine("=== Користувачі соцмережі ===");
+            foreach (var u in users) u.PrintInfo();
+
+            var ivan = users[0];
+            var olena = users[1];
+            var max = users[2];
+
+            // Початкові пости Олени (з різними датами створення)
+            Console.WriteLine("\n=== Створення постів ===");
+            olena.CreatePost("Сьогодні чудова погода у Львові!", DateTime.Now.AddDays(-7));
+            olena.CreatePost("Почала вивчати C#, поки що цікаво.", DateTime.Now.AddDays(-6));
+            olena.CreatePost("Рецепт борщу від бабусі.", DateTime.Now.AddDays(-5));
+            olena.CreatePost("Подорож до Карпат була неймовірною.", DateTime.Now.AddDays(-3));
+            olena.CreatePost("Нова книга на вихідні.", DateTime.Now.AddDays(-2));
+            var lastPost = olena.CreatePost("Всім гарного дня!", DateTime.Now.AddHours(-1));
+
+            // Лайки та коментарі
+            Console.WriteLine("\n=== Лайки та коментарі ===");
+            ivan.Like(lastPost);
+            ivan.Like(lastPost);                 // повторний лайк не рахується
+            max.Like(lastPost);
+            ivan.AddComment(lastPost, "І вам гарного дня!");
+            max.AddComment(olena.Posts[3], "Фото з Карпат є?");
+
+            // Іван переглядає останні 5 постів Олени
+            ivan.ShowLastPosts(olena);
+
+            // Створення нового поста
+            Console.WriteLine("\n=== Створення власного поста ===");
+            var ivanPost = ivan.CreatePost("Мій перший пост у цій соцмережі.");
+
+            // Видалення поста
+            Console.WriteLine("\n=== Видалення поста ===");
+            max.DeletePost(ivanPost);            // чужий пост — заборонено
+            ivan.DeletePost(ivanPost);           // свій пост — дозволено
+
+            Console.WriteLine();
+            ivan.PrintInfo();
+            olena.PrintInfo();
+            max.PrintInfo();
+        }
+    }
+}
